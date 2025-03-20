@@ -1,0 +1,27 @@
+image:
+  file: .gitpod.Dockerfile
+
+ports:
+  - port: 3000
+    onOpen: open-preview
+    name: Rails server
+    description: Rails application preview
+  - port: 5432
+    onOpen: ignore
+    name: PostgreSQL
+    description: PostgreSQL database
+
+tasks:
+  - name: Setup and Server
+    init: |
+      chmod +x init_rails.sh
+      ./init_rails.sh
+    command: |
+      bin/rails server -b 0.0.0.0
+
+vscode:
+  extensions:
+    - rebornix.ruby
+    - wingrunr21.vscode-ruby
+    - castwide.solargraph
+    - kaiwood.endwise 
