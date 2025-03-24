@@ -1,6 +1,13 @@
 require "active_support/core_ext/integer/time"
 
 Rails.application.configure do
+  # Configure allowed hosts
+  # Note: This is overridden by config/initializers/direct_host_config.rb
+  # which sets config.hosts = nil in development mode to allow all hosts
+  
+  # Disable basic auth for development
+  config.middleware.delete Rack::Auth::Basic
+  
   # Settings specified here will take precedence over those in config/application.rb.
 
   # Make code changes take effect immediately without server restart.

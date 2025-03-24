@@ -48,8 +48,19 @@ RUN bundle exec bootsnap precompile app/ lib/
 # Precompiling assets for production without requiring secret RAILS_MASTER_KEY
 RUN SECRET_KEY_BASE_DUMMY=1 ./bin/rails assets:precompile
 
+# Get dependencies
+RUN bundle install
 
+# Add command to modify Rails configuration for Gitpod hosts
+RUN mkdir -p /rails/bin
+COPY ./bin/docker-entrypoint.sh /rails/bin/docker-entrypoint.sh
+RUN chmod +x /rails/bin/docker-entrypoint.sh
 
+# Expose port
+EXPOSE 3000
+
+# Set up the entrypoint script
+ENTRYPOINT ["/rails/bin/docker-entrypoint.sh"]
 
 # Final stage for app image
 FROM base

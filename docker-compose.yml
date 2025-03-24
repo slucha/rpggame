@@ -26,6 +26,7 @@ services:
       DATABASE_URL: postgres://postgres:password@db:5432/rpggame_development
       RAILS_ENV: development
       RAILS_MAX_THREADS: 5
+      DISABLE_HOST_CHECK: "true"
     command: bash -c "rm -f tmp/pids/server.pid && bundle exec rails s -b '0.0.0.0'"
 
 volumes:

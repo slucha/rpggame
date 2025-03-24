@@ -4,6 +4,7 @@ image:
 ports:
   - port: 3000
     onOpen: open-preview
+    visibility: public
     name: Rails server
     description: Rails application preview
   - port: 5432
@@ -12,12 +13,13 @@ ports:
     description: PostgreSQL database
 
 tasks:
-  - name: Setup and Server
+  - name: Docker Compose
     init: |
-      chmod +x init_rails.sh
-      ./init_rails.sh
+      cd /workspace/rpggame
+      docker-compose build
     command: |
-      bin/rails server -b 0.0.0.0
+      cd /workspace/rpggame
+      docker-compose up
 
 vscode:
   extensions:

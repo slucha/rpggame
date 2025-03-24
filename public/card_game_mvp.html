@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Card Game MVP</title>
+    <script src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.22.20/babel.min.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+        }
+    }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        window.THREE = THREE;
+    </script>
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #root { display: flex; height: 100vh; }
+        .game-container { 
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .battlefield { 
+            flex: 1;
+            background: #2a2a2a;
+            position: relative;
+        }
+        .player-area, .bot-area {
+            height: 200px;
+            background: #333;
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        .card {
+            width: 100px;
+            height: 150px;
+            background: #444;
+            border: 2px solid #666;
+            border-radius: 5px;
+            padding: 5px;
+            cursor: pointer;
+            position: relative;
+        }
+        .card.selected {
+            border-color: #00ff00;
+        }
+        .card-stats {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            font-size: 12px;
+            color: white;
+        }
+        .mana-display {
+            color: white;
+            margin: 10px;
+        }
+        .health-display {
+            color: white;
+            margin: 10px;
+        }
+        .controls {
+            padding: 10px;
+            display: flex;
+            gap: 10px;
+            background: #222;
+        }
+        button {
+            padding: 10px 20px;
+            cursor: pointer;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .card.can-attack {
+            border-color: #ffff00;
+            box-shadow: 0 0 10px #ffff00;
+        }
+        .card.can-attack:hover {
+            transform: scale(1.05);
+            transition: transform 0.2s;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        // Game Constants
+        const INITIAL_HEALTH = 30;
+        const INITIAL_MANA = 1;
+        const MAX_MANA = 10;
+        const CARDS_IN_HAND = 4;
+
+        // Card Templates
+        const CARD_TEMPLATES = [
+            { id: 1, name: "Warrior", attack: 2, health: 3, manaCost: 2 },
+            { id: 2, name: "Archer", attack: 3, health: 2, manaCost: 2 },
+            { id: 3, name: "Knight", attack: 4, health: 4, manaCost: 4 },
+            { id: 4, name: "Mage", attack: 5, health: 2, manaCost: 5 },
+            { id: 5, name: "Giant", attack: 6, health: 6, manaCost: 6 },
+        ];
+
+        // Game Component
+        function Game() {
+            const [gameState, setGameState] = React.useState({
+                playerHealth: INITIAL_HEALTH,
+                botHealth: INITIAL_HEALTH,
+                playerMana: INITIAL_MANA,
+                botMana: INITIAL_MANA,
+                playerHand: [],
+                botHand: [],
+                playerField: [],
+                botField: [],
+                turn: 'player',
+                selectedCard: null,
+                targetCard: null,
+                turnNumber: 1
+            });
+
+            // Initialize Three.js scene
+            React.useEffect(() => {
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                const renderer = new THREE.WebGLRenderer();
+                
+                const battlefield = document.querySelector('.battlefield');
+                renderer.setSize(battlefield.clientWidth, battlefield.clientHeight);
+                battlefield.appendChild(renderer.domElement);
+
+                // Add simple battlefield visualization
+                const geometry = new THREE.PlaneGeometry(10, 10);
+                const material = new THREE.MeshBasicMaterial({ color: 0x228822, side: THREE.DoubleSide });
+                const plane = new THREE.Mesh(geometry, material);
+                scene.add(plane);
+
+                camera.position.z = 5;
+
+                function animate() {
+                    requestAnimationFrame(animate);
+                    renderer.render(scene, camera);
+                }
+                animate();
+
+                return () => {
+                    battlefield.removeChild(renderer.domElement);
+                };
+            }, []);
+
+            // Initialize game
+            React.useEffect(() => {
+                dealInitialHands();
+            }, []);
+
+            // Deal initial hands
+            const dealInitialHands = () => {
+                const playerHand = [];
+                const botHand = [];
+                
+                for (let i = 0; i < CARDS_IN_HAND; i++) {
+                    playerHand.push(getRandomCard());
+                    botHand.push(getRandomCard());
+                }
+
+                setGameState(prev => ({
+                    ...prev,
+                    playerHand,
+                    botHand
+                }));
+            };
+
+            // Get random card from templates
+            const getRandomCard = () => {
+                const template = CARD_TEMPLATES[Math.floor(Math.random() * CARD_TEMPLATES.length)];
+                return { ...template, instanceId: Math.random().toString(36).substr(2, 9) };
+            };
+
+            // Handle card selection
+            const handleCardSelect = (card) => {
+                if (gameState.turn !== 'player') return;
+                
+                if (card.manaCost > gameState.playerMana) {
+                    alert("Not enough mana!");
+                    return;
+                }
+
+                setGameState(prev => ({
+                    ...prev,
+                    selectedCard: card
+                }));
+            };
+
+            // Play card
+            const playCard = () => {
+                if (!gameState.selectedCard) return;
+
+                setGameState(prev => {
+                    const newHand = prev.playerHand.filter(c => c.instanceId !== prev.selectedCard.instanceId);
+                    return {
+                        ...prev,
+                        playerHand: newHand,
+                        playerField: [...prev.playerField, {...prev.selectedCard, canAttack: false}],
+                        playerMana: prev.playerMana - prev.selectedCard.manaCost,
+                        selectedCard: null
+                    };
+                });
+            };
+
+            // Attack with card
+            const attackWithCard = (card) => {
+                if (gameState.turn !== 'player' || !card.canAttack) return;
+
+                setGameState(prev => {
+                    const newState = {...prev};
+                    if (prev.botField.length > 0) {
+                        // Attack first bot card
+                        const targetCard = prev.botField[0];
+                        targetCard.health -= card.attack;
+                        card.health -= targetCard.attack;
+                        
+                        // Clean up dead cards
+                        newState.botField = prev.botField.filter(c => c.health > 0);
+                        newState.playerField = prev.playerField.map(c => 
+                            c.instanceId === card.instanceId && c.health > 0 ? {...c, canAttack: false} : c
+                        ).filter(c => c.health > 0);
+                    } else {
+                        // Attack bot directly
+                        newState.botHealth = prev.botHealth - card.attack;
+                        newState.playerField = prev.playerField.map(c => 
+                            c.instanceId === card.instanceId ? {...c, canAttack: false} : c
+                        );
+                    }
+                    return newState;
+                });
+            };
+
+            // End turn
+            const endTurn = () => {
+                if (gameState.turn !== 'player') return;
+
+                // Bot's turn logic
+                setGameState(prev => {
+                    const newState = { ...prev, turn: 'bot' };
+                    
+                    // Bot plays cards if possible
+                    let remainingMana = prev.botMana;
+                    const playableCards = [...prev.botHand]
+                        .sort((a, b) => b.manaCost - a.manaCost) // Play highest cost cards first
+                        .filter(card => card.manaCost <= remainingMana);
+
+                    playableCards.forEach(cardToPlay => {
+                        if (cardToPlay.manaCost <= remainingMana) {
+                            newState.botHand = newState.botHand.filter(c => c.instanceId !== cardToPlay.instanceId);
+                            newState.botField = [...newState.botField, {...cardToPlay, canAttack: false}];
+                            remainingMana -= cardToPlay.manaCost;
+                        }
+                    });
+
+                    newState.botMana = remainingMana;
+
+                    // Bot attacks with all cards
+                    newState.botField.forEach(card => {
+                        if (prev.playerField.length > 0) {
+                            // Attack first player card
+                            const targetCard = prev.playerField[0];
+                            targetCard.health -= card.attack;
+                            card.health -= targetCard.attack;
+                        } else {
+                            // Attack player directly
+                            newState.playerHealth -= card.attack;
+                        }
+                    });
+
+                    // Clean up dead cards
+                    newState.playerField = prev.playerField.filter(card => card.health > 0);
+                    newState.botField = newState.botField.filter(card => card.health > 0);
+
+                    // Start next turn
+                    newState.turn = 'player';
+                    newState.turnNumber = prev.turnNumber + 1;
+                    newState.playerMana = Math.min(prev.turnNumber + 1, MAX_MANA);
+                    newState.botMana = Math.min(prev.turnNumber + 1, MAX_MANA);
+
+                    // Enable attacks for player's cards
+                    newState.playerField = newState.playerField.map(card => ({...card, canAttack: true}));
+
+                    // Draw cards
+                    if (newState.playerHand.length < CARDS_IN_HAND) {
+                        newState.playerHand.push(getRandomCard());
+                    }
+                    if (newState.botHand.length < CARDS_IN_HAND) {
+                        newState.botHand.push(getRandomCard());
+                    }
+
+                    return newState;
+                });
+            };
+
+            // Check for game over
+            React.useEffect(() => {
+                if (gameState.playerHealth <= 0) {
+                    alert("Game Over - Bot Wins!");
+                    window.location.reload();
+                } else if (gameState.botHealth <= 0) {
+                    alert("Congratulations - You Win!");
+                    window.location.reload();
+                }
+            }, [gameState.playerHealth, gameState.botHealth]);
+
+            return (
+                <div className="game-container">
+                    <div className="bot-area">
+                        <div className="health-display">Bot Health: {gameState.botHealth}</div>
+                        <div className="mana-display">Bot Mana: {gameState.botMana}</div>
+                        {gameState.botField.map(card => (
+                            <div key={card.instanceId} className="card">
+                                <div>{card.name}</div>
+                                <div className="card-stats">
+                                    {card.attack}/{card.health}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div className="battlefield" id="battlefield"></div>
+                    
+                    <div className="player-area">
+                        <div className="health-display">Player Health: {gameState.playerHealth}</div>
+                        <div className="mana-display">Player Mana: {gameState.playerMana}</div>
+                        {gameState.playerField.map(card => (
+                            <div 
+                                key={card.instanceId} 
+                                className={`card ${card.canAttack ? 'can-attack' : ''}`}
+                                onClick={() => attackWithCard(card)}
+                                style={{cursor: card.canAttack ? 'pointer' : 'default'}}
+                            >
+                                <div>{card.name}</div>
+                                <div className="card-stats">
+                                    {card.attack}/{card.health}
+                                </div>
+                                {!card.canAttack && <div style={{color: '#ff6666'}}>Can't Attack</div>}
+                            </div>
+                        ))}
+                    </div>
+                    
+                    <div className="controls">
+                        <div className="hand">
+                            {gameState.playerHand.map(card => (
+                                <div 
+                                    key={card.instanceId} 
+                                    className={`card ${gameState.selectedCard?.instanceId === card.instanceId ? 'selected' : ''}`}
+                                    onClick={() => handleCardSelect(card)}
+                                >
+                                    <div>{card.name}</div>
+                                    <div>Cost: {card.manaCost}</div>
+                                    <div className="card-stats">
+                                        {card.attack}/{card.health}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <button 
+                            onClick={playCard} 
+                            disabled={!gameState.selectedCard || gameState.turn !== 'player'}
+                        >
+                            Play Card
+                        </button>
+                        <button 
+                            onClick={endTurn}
+                            disabled={gameState.turn !== 'player'}
+                        >
+                            End Turn
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        // Render the game
+        ReactDOM.render(<Game />, document.getElementById('root'));
+    </script>
+</body>
+</html> 

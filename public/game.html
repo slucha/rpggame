@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Game - Legends of Runeterra Clone</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    
+    <!-- React and Three.js loaded via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/three@0.161.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.161.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #282c34;
+        color: white;
+        font-family: 'Arial', sans-serif;
+      }
+      
+      .game-board {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      
+      .player-area, .bot-area {
+        display: flex;
+        flex-direction: column;
+        height: 45%;
+        padding: 20px;
+        box-sizing: border-box;
+      }
+      
+      .battlefield {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 70%;
+      }
+      
+      .hand {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      
+      .card {
+        width: 120px;
+        height: 180px;
+        background-color: #444;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px;
+        box-sizing: border-box;
+        transition: transform 0.2s;
+      }
+      
+      .card:hover {
+        transform: translateY(-10px) scale(1.05);
+      }
+      
+      .card-name {
+        font-weight: bold;
+        margin: 5px 0;
+      }
+      
+      .card-stats {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+      }
+      
+      .attack, .defense {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+      }
+      
+      .attack {
+        background-color: #d9534f;
+      }
+      
+      .defense {
+        background-color: #5bc0de;
+      }
+      
+      .health-bar {
+        width: 100%;
+        height: 20px;
+        background-color: #333;
+        border-radius: 10px;
+        margin: 10px 0;
+        overflow: hidden;
+      }
+      
+      .health-fill {
+        height: 100%;
+        background-color: #5cb85c;
+      }
+      
+      #canvas-container {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+        z-index: -1;
+      }
+      
+      .game-menu {
+        text-align: center;
+        padding: 20px;
+      }
+      
+      .btn {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 5px;
+        margin: 10px;
+        cursor: pointer;
+        border: none;
+        font-size: 16px;
+      }
+      
+      .btn:hover {
+        background-color: #0056b3;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="canvas-container"></div>
+    
+    <!-- Game script -->
+    <script type="text/babel">
+      // React components for our game
+      function Card({ card, onClick }) {
+        return (
+          <div className="card" onClick={onClick}>
+            <div className="card-image" style={{ 
+              width: '100px', 
+              height: '100px', 
+              backgroundColor: '#666',
+              borderRadius: '5px'
+            }}></div>
+            <div className="card-name">{card.name}</div>
+            <div className="card-stats">
+              <div className="attack">{card.attack}</div>
+              <div className="defense">{card.defense}</div>
+            </div>
+          </div>
+        );
+      }
+      
+      function Hand({ cards, onCardPlay }) {
+        return (
+          <div className="hand">
+            {cards.map((card, index) => (
+              <Card 
+                key={index} 
+                card={card} 
+                onClick={() => onCardPlay(index)} 
+              />
+            ))}
+          </div>
+        );
+      }
+      
+      function HealthBar({ current, max }) {
+        const healthPercentage = (current / max) * 100;
+        return (
+          <div className="health-bar">
+            <div 
+              className="health-fill" 
+              style={{ width: `${healthPercentage}%` }}
+            ></div>
+          </div>
+        );
+      }
+      
+      function PlayerArea({ player, onCardPlay }) {
+        return (
+          <div className="player-area">
+            <div className="battlefield">
+              {/* Cards on the battlefield */}
+            </div>
+            <HealthBar current={player.health} max={20} />
+            <Hand cards={player.hand} onCardPlay={onCardPlay} />
+          </div>
+        );
+      }
+      
+      function BotArea({ bot }) {
+        return (
+          <div className="bot-area">
+            <Hand cards={bot.hand.map(() => ({ name: '???', attack: '?', defense: '?' }))} onCardPlay={() => {}} />
+            <HealthBar current={bot.health} max={20} />
+            <div className="battlefield">
+              {/* Bot cards on the battlefield */}
+            </div>
+          </div>
+        );
+      }
+      
+      function GameBoard({ gameState, onCardPlay, onEndTurn }) {
+        return (
+          <div className="game-board">
+            <BotArea bot={gameState.bot} />
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'center',
+              margin: '10px 0'
+            }}>
+              <button 
+                onClick={onEndTurn}
+                className="btn"
+              >
+                End Turn
+              </button>
+            </div>
+            <PlayerArea 
+              player={gameState.player} 
+              onCardPlay={onCardPlay} 
+            />
+          </div>
+        );
+      }
+      
+      function Game() {
+        const [gameState, setGameState] = React.useState(null);
+        const [loading, setLoading] = React.useState(true);
+        const [error, setError] = React.useState(null);
+        
+        // Initialize the game on component mount
+        React.useEffect(() => {
+          startGame();
+        }, []);
+        
+        // Initialize the WebGL battlefield
+        React.useEffect(() => {
+          initializeBattlefield();
+        }, []);
+        
+        const startGame = async () => {
+          try {
+            // For the simplified version, we'll use mock data
+            setGameState({
+              turn: 'player',
+              player: {
+                health: 20,
+                hand: [
+                  { name: 'Knight', attack: 3, defense: 3 },
+                  { name: 'Archer', attack: 2, defense: 1 },
+                  { name: 'Mage', attack: 4, defense: 2 },
+                  { name: 'Dragon', attack: 5, defense: 5 },
+                  { name: 'Golem', attack: 2, defense: 6 }
+                ],
+                board: [],
+                deck: Array(20).fill({})
+              },
+              bot: {
+                health: 20,
+                hand: Array(5).fill({}),
+                board: [],
+                deck: Array(20).fill({})
+              }
+            });
+            setLoading(false);
+          } catch (err) {
+            setError("Could not start game");
+            setLoading(false);
+          }
+        };
+        
+        const handleCardPlay = (cardIndex) => {
+          // Mock card play action
+          const newHand = [...gameState.player.hand];
+          const playedCard = newHand[cardIndex];
+          newHand.splice(cardIndex, 1);
+          
+          setGameState({
+            ...gameState,
+            player: {
+              ...gameState.player,
+              hand: newHand,
+              board: [...gameState.player.board, playedCard]
+            }
+          });
+          
+          // Add a 3D card to the battlefield for demonstration
+          addCardToBattlefield({ x: Math.random() * 2 - 1, y: 0, z: Math.random() * 2 - 1 });
+        };
+        
+        const handleEndTurn = () => {
+          // Mock bot turn
+          setGameState({
+            ...gameState,
+            player: {
+              ...gameState.player,
+              health: gameState.player.health - Math.floor(Math.random() * 3) // Random damage 0-2
+            },
+            bot: {
+              ...gameState.bot,
+              board: [...gameState.bot.board, { name: 'Bot Card', attack: 2, defense: 2 }]
+            }
+          });
+          
+          // Add a 3D card to the bot's side of the battlefield
+          addCardToBattlefield({ x: Math.random() * 2 - 1, y: 0, z: -1 - Math.random() * 2 });
+        };
+        
+        const handleMainMenu = () => {
+          window.location.href = '/';
+        };
+        
+        if (loading) {
+          return <div className="game-menu">Loading...</div>;
+        }
+        
+        if (error) {
+          return (
+            <div className="game-menu">
+              <h2>Error</h2>
+              <p>{error}</p>
+              <button onClick={startGame} className="btn">Try Again</button>
+              <button onClick={handleMainMenu} className="btn">Main Menu</button>
+            </div>
+          );
+        }
+        
+        return (
+          <GameBoard 
+            gameState={gameState} 
+            onCardPlay={handleCardPlay}
+            onEndTurn={handleEndTurn}
+          />
+        );
+      }
+      
+      // Three.js code for the 3D battlefield
+      let scene, camera, renderer, controls;
+      const cards3D = [];
+      
+      function initializeBattlefield() {
+        const container = document.getElementById('canvas-container');
+        
+        // Create scene
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+        
+        // Create camera
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 3, 3);
+        
+        // Create renderer
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+        
+        // Add controls
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        
+        // Add lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(1, 5, 1);
+        scene.add(directionalLight);
+        
+        // Add battlefield plane
+        const battlefieldGeometry = new THREE.PlaneGeometry(5, 5);
+        const battlefieldMaterial = new THREE.MeshStandardMaterial({ 
+          color: 0x2a623d,
+          side: THREE.DoubleSide
+        });
+        const battlefield = new THREE.Mesh(battlefieldGeometry, battlefieldMaterial);
+        battlefield.rotation.x = Math.PI / 2;
+        scene.add(battlefield);
+        
+        // Add dividing line
+        const lineMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-2.5, 0, 0),
+          new THREE.Vector3(2.5, 0, 0)
+        ]);
+        const line = new THREE.Line(lineGeometry, lineMaterial);
+        scene.add(line);
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // Start animation loop
+        animate();
+      }
+      
+      function animate() {
+        requestAnimationFrame(animate);
+        controls.update();
+        
+        // Animate cards
+        cards3D.forEach(card => {
+          card.rotation.y += 0.01;
+        });
+        
+        renderer.render(scene, camera);
+      }
+      
+      function addCardToBattlefield(position) {
+        // Create a 3D card
+        const cardGeometry = new THREE.BoxGeometry(0.7, 0.1, 1);
+        const cardMaterial = new THREE.MeshStandardMaterial({ 
+          color: Math.random() * 0xffffff
+        });
+        const card = new THREE.Mesh(cardGeometry, cardMaterial);
+        
+        card.position.set(position.x, position.y, position.z);
+        scene.add(card);
+        cards3D.push(card);
+        
+        return card;
+      }
+      
+      // Render our React app
+      ReactDOM.render(<Game />, document.getElementById('root'));
+    </script>
+  </body>
+</html> 
