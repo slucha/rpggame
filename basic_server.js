@@ -22,6 +22,9 @@ const server = http.createServer((req, res) => {
   else if (req.url === '/minimal' || req.url === '/minimal.html') {
     serveFile(res, 'public/minimal.html', 'text/html');
   }
+  else if (req.url === '/standalone' || req.url === '/standalone.html') {
+    serveFile(res, 'public/standalone.html', 'text/html');
+  }
   else if (req.url === '/hello') {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Hello World from basic Node.js server');
@@ -88,6 +91,7 @@ server.listen(PORT, '0.0.0.0', () => {
   - http://localhost:${PORT}/
   - http://localhost:${PORT}/game
   - http://localhost:${PORT}/minimal
+  - http://localhost:${PORT}/standalone
   - http://localhost:${PORT}/hello
   - http://localhost:${PORT}/api/basic`);
   
@@ -95,6 +99,7 @@ server.listen(PORT, '0.0.0.0', () => {
   - https://8080-slucha-rpggame-k76dclncl0c.ws-eu118.gitpod.io/
   - https://8080-slucha-rpggame-k76dclncl0c.ws-eu118.gitpod.io/game
   - https://8080-slucha-rpggame-k76dclncl0c.ws-eu118.gitpod.io/minimal
+  - https://8080-slucha-rpggame-k76dclncl0c.ws-eu118.gitpod.io/standalone
   - https://8080-slucha-rpggame-k76dclncl0c.ws-eu118.gitpod.io/hello
   - https://8080-slucha-rpggame-k76dclncl0c.ws-eu118.gitpod.io/api/basic`);
 }); 

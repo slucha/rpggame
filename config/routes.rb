@@ -8,6 +8,7 @@ Rails.application.routes.draw do
   # Direct static file URLs - SECOND HIGHEST PRIORITY
   get 'static.html', to: redirect('/static')
   get 'game.html', to: redirect('/static/game')
+  get 'standalone.html', to: redirect('/standalone')
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
@@ -27,6 +28,9 @@ Rails.application.routes.draw do
 
   # Game UI route
   get 'game', to: 'game#index'
+  
+  # Standalone game route
+  get 'standalone', to: 'html_game#standalone'
   
   # Home route for React SPA
   root "home#index"
