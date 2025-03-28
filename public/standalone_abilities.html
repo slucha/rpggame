@@ -54,10 +54,10 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        justify-content: space-between;
         padding: 8px;
         box-sizing: border-box;
         transition: transform 0.2s;
+        position: relative;
       }
       
       .card:hover {
@@ -67,12 +67,18 @@
       .card-name {
         font-weight: bold;
         margin: 5px 0;
+        text-align: center;
+        font-size: 1.1em;
+        width: 100%;
       }
       
       .card-stats {
         display: flex;
         justify-content: space-between;
         width: 100%;
+        padding: 0 5px;
+        margin: 5px 0;
+        font-size: 1.2em;
       }
       
       .attack, .defense {
@@ -91,6 +97,74 @@
       
       .defense {
         background-color: #5bc0de;
+      }
+      
+      .card-mana {
+        font-size: 0.9em;
+        color: #ffd700;
+        margin: 5px 0;
+        padding: 2px 6px;
+        background-color: rgba(0, 0, 0, 0.3);
+        border-radius: 3px;
+      }
+
+      /* Card ability styles */
+      .card-ability {
+        width: calc(100% - 10px);
+        background-color: rgba(0, 0, 0, 0.7);
+        border-radius: 4px;
+        padding: 4px 6px;
+        font-size: 0.8em;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: auto;
+      }
+
+      .ability-icon {
+        min-width: 20px;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        font-size: 1.2em;
+        flex-shrink: 0;
+      }
+
+      .ability-icon.damageOpponentHand {
+        background-color: rgba(217, 83, 79, 0.3);
+        color: #ff4444;
+      }
+
+      .ability-icon.buffOwnHand {
+        background-color: rgba(92, 184, 92, 0.3);
+        color: #5cb85c;
+      }
+
+      .ability-icon.protectHand {
+        background-color: rgba(91, 192, 222, 0.3);
+        color: #5bc0de;
+      }
+
+      .ability-text {
+        flex: 1;
+        color: #fff;
+        text-align: left;
+        line-height: 1.2;
+        font-size: 0.9em;
+        word-wrap: break-word;
+      }
+
+      .protection-status {
+        position: absolute;
+        top: 5px;
+        right: 5px;
+        background-color: rgba(91, 192, 222, 0.3);
+        color: #5bc0de;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.7em;
       }
       
       .health-bar {
@@ -745,8 +819,35 @@
             <div class="card-name">{{ card.name }}</div>
             <div class="card-stats">{{ card.attack }}/{{ card.defense }}</div>
             <div class="card-mana">Cost: {{ card.manaCost }}</div>
+            <div v-if="card.ability" class="card-ability">
+              <div class="ability-icon" :class="card.ability.type">
+                <span v-html="getAbilityIcon(card.ability.type)"></span>
           </div>
-        `
+              <div class="ability-text">{{ getAbilityText(card.ability) }}</div>
+            </div>
+            <div v-if="card.status?.protected" class="protection-status">
+              Protected ({{ card.status.protected }})
+            </div>
+          </div>
+        `,
+        methods: {
+          getAbilityIcon(type) {
+            switch(type) {
+              case 'damageOpponentHand': return '&#9889;';  // lightning bolt
+              case 'buffOwnHand': return '&#8593;';         // up arrow
+              case 'protectHand': return '&#128737;';       // shield
+              default: return '&#10022;';                   // star
+            }
+          },
+          getAbilityText(ability) {
+            switch(ability.type) {
+              case 'damageOpponentHand': return `Deal ${ability.value} damage to opponent's hand`;
+              case 'buffOwnHand': return `+${ability.value} to hand cards`;
+              case 'protectHand': return `Protect hand for ${ability.value} turns`;
+              default: return '';
+            }
+          }
+        }
       };
       
       // Combat Log component
@@ -971,8 +1072,82 @@
             { name: "Healer", attack: 1, defense: 3, manaCost: 3 },
             { name: "Assassin", attack: 4, defense: 1, manaCost: 3 },
             { name: "Guardian", attack: 1, defense: 5, manaCost: 4 },
-            { name: "Berserker", attack: 4, defense: 3, manaCost: 6 }
+            { name: "Berserker", attack: 4, defense: 3, manaCost: 6 },
+            // New cards with abilities
+            { 
+              name: "Arcane Bomber", 
+              attack: 2, 
+              defense: 1, 
+              manaCost: 3,
+              ability: {
+                trigger: "enterBattlefield",
+                type: "damageOpponentHand",
+                value: 1
+              }
+            },
+            {
+              name: "Battle Priest",
+              attack: 2,
+              defense: 2,
+              manaCost: 3,
+              ability: {
+                trigger: "enterBattlefield",
+                type: "buffOwnHand",
+                value: 1
+              }
+            },
+            {
+              name: "Shield Master",
+              attack: 2,
+              defense: 3,
+              manaCost: 4,
+              ability: {
+                trigger: "enterBattlefield",
+                type: "protectHand",
+                value: 2
+              }
+            }
           ];
+          
+          const processBotTurn = () => {
+            const turnPrefix = `[Turn_${gameState.turnNumber}][BotTurn][Bot]`;
+            console.log(`${turnPrefix} Starting bot's turn`);
+            console.log(`${turnPrefix} Current state:`, {
+              health: gameState.bot.health,
+              mana: gameState.bot.mana,
+              handSize: gameState.bot.hand.length,
+              boardSize: gameState.bot.board.length
+            });
+            console.log(`${turnPrefix} Hand:`, gameState.bot.hand);
+            console.log(`${turnPrefix} Board:`, gameState.bot.board);
+            
+            // Bot can play up to 2 cards per turn to avoid excessive moves
+            for (let i = 0; i < 2; i++) {
+              // Try to play a card
+              const cardPlayed = botPlayCard();
+              if (!cardPlayed) {
+                // No more cards could be played
+                break;
+              }
+              console.log(`${turnPrefix} Bot played card #${i+1}`);
+            }
+            
+            // Log the final state
+            console.log(`${turnPrefix} Final state:`, {
+              remainingMana: gameState.bot.mana,
+              handSize: gameState.bot.hand.length,
+              boardSize: gameState.bot.board.length
+            });
+
+            // Bot initiates battle if it has cards
+            if (gameState.bot.board.length > 0) {
+              console.log(`${turnPrefix} Initiating battle phase with board:`, gameState.bot.board);
+              battle();
+            } else {
+              console.log(`${turnPrefix} No cards to battle with`);
+              setTimeout(() => endTurn(), 1000);
+            }
+          };
           
           // Initialize game by creating decks and hands
           const initializeGame = () => {
@@ -1004,7 +1179,8 @@
                   name: sourceCard.name,
                   attack: sourceCard.attack,
                   defense: sourceCard.defense,
-                  manaCost: sourceCard.manaCost
+                  manaCost: sourceCard.manaCost,
+                  ability: sourceCard.ability ? { ...sourceCard.ability } : undefined
                 });
                 
                 // Create deep copies for bot deck
@@ -1012,7 +1188,8 @@
                   name: sourceCard.name,
                   attack: sourceCard.attack,
                   defense: sourceCard.defense,
-                  manaCost: sourceCard.manaCost
+                  manaCost: sourceCard.manaCost,
+                  ability: sourceCard.ability ? { ...sourceCard.ability } : undefined
                 });
               });
             }
@@ -1053,112 +1230,212 @@
           
           // Draw a card from deck to hand
           const drawCard = (player) => {
+            console.log(`Drawing card for ${player}`);
             const deck = gameState[player].deck;
             const hand = gameState[player].hand;
             
             if (deck.length === 0) {
-              // No cards left in deck
+              console.log(`${player}'s deck is empty!`);
               addToCombatLog(`${player === 'player' ? 'You have' : 'Bot has'} no more cards to draw!`, 'warning');
               return false;
             }
             
-            // Take the top card from the deck and make a deep copy to avoid reference issues
-            const sourceCard = deck.shift();
-            const card = {
-              name: sourceCard.name,
-              attack: sourceCard.attack,
-              defense: sourceCard.defense,
-              manaCost: sourceCard.manaCost
-            };
-            
-            // Add to hand
+            const card = deck.shift();
             hand.push(card);
             
+            console.log(`${player} drew ${card.name}`);
+            console.log(`${player}: Deck: ${deck.length} | Hand: ${hand.length}`);
             addToCombatLog(`${player === 'player' ? 'You draw' : 'Bot draws'} a ${card.name}`, 'info');
             return true;
           };
           
-          // Play a card from hand to board
+          // Add handleCardAbility function before playCard
+          const handleCardAbility = (card, owner, gameState) => {
+            if (!card.ability || card.ability.trigger !== "enterBattlefield") {
+              return;
+            }
+
+            console.log(`[Ability] ${card.name}'s ability triggered:`, card.ability);
+            const opponent = owner === 'player' ? 'bot' : 'player';
+
+            switch (card.ability.type) {
+              case 'damageOpponentHand':
+                console.log(`[Ability] Before damage - ${opponent}'s hand:`, gameState[opponent].hand);
+                if (gameState[opponent].hand.length === 0) {
+                  console.log(`[Ability] No cards in ${opponent}'s hand to damage`);
+                  addToCombatLog(`${card.name}'s ability had no effect - opponent's hand is empty`, 'ability');
+                  break;
+                }
+                // Create a new array with modified cards to ensure reactivity
+                const damagedHand = gameState[opponent].hand.map(c => {
+                  const newDefense = Math.max(0, c.defense - card.ability.value);
+                  console.log(`[Ability] Damaging ${c.name}: ${c.defense} -> ${newDefense}`);
+                  return {
+                    ...c,
+                    defense: newDefense
+                  };
+                });
+                
+                // Directly assign the new array to ensure Vue reactivity
+                gameState[opponent].hand = damagedHand;
+                
+                // Log damage dealt to each card
+                gameState[opponent].hand.forEach(c => {
+                  addToCombatLog(`${card.name} deals ${card.ability.value} damage to ${c.name} in ${opponent}'s hand`, 'ability');
+                });
+                console.log(`[Ability] After damage - ${opponent}'s hand:`, gameState[opponent].hand);
+                break;
+
+              case 'buffOwnHand':
+                console.log(`[Ability] Before buff - ${owner}'s hand:`, gameState[owner].hand);
+                if (gameState[owner].hand.length === 0) {
+                  console.log(`[Ability] No cards in ${owner}'s hand to buff`);
+                  addToCombatLog(`${card.name}'s ability had no effect - your hand is empty`, 'ability');
+                  break;
+                }
+                // Create a new array with modified cards to ensure reactivity
+                const buffedHand = gameState[owner].hand.map(c => {
+                  const newAttack = c.attack + card.ability.value;
+                  const newDefense = c.defense + card.ability.value;
+                  console.log(`[Ability] Buffing ${c.name}: ${c.attack}/${c.defense} -> ${newAttack}/${newDefense}`);
+                  return {
+                    ...c,
+                    attack: newAttack,
+                    defense: newDefense
+                  };
+                });
+                // Directly assign the new array to ensure Vue reactivity
+                gameState[owner].hand = buffedHand;
+                
+                gameState[owner].hand.forEach(c => {
+                  addToCombatLog(`${card.name} buffs ${c.name} in ${owner}'s hand by +${card.ability.value}`, 'ability');
+                });
+                console.log(`[Ability] After buff - ${owner}'s hand:`, gameState[owner].hand);
+                break;
+
+              case 'protectHand':
+                console.log(`[Ability] Before protection - ${owner}'s hand:`, gameState[owner].hand);
+                if (gameState[owner].hand.length === 0) {
+                  console.log(`[Ability] No cards in ${owner}'s hand to protect`);
+                  addToCombatLog(`${card.name}'s ability had no effect - your hand is empty`, 'ability');
+                  break;
+                }
+                // Create a new array with modified cards to ensure reactivity
+                const protectedHand = gameState[owner].hand.map(c => {
+                  console.log(`[Ability] Protecting ${c.name} for ${card.ability.value} turns`);
+                  return {
+                    ...c,
+                    status: { ...c.status, protected: card.ability.value }
+                  };
+                });
+                // Directly assign the new array to ensure Vue reactivity
+                gameState[owner].hand = protectedHand;
+                
+                gameState[owner].hand.forEach(c => {
+                  addToCombatLog(`${card.name} gives ${c.name} in ${owner}'s hand ${card.ability.value} turns of protection`, 'ability');
+                });
+                console.log(`[Ability] After protection - ${owner}'s hand:`, gameState[owner].hand);
+                break;
+            }
+
+            // Log final state after ability resolution
+            console.log(`[Ability] Final state after ${card.name}'s ability:`, {
+              playerHand: gameState.player.hand,
+              botHand: gameState.bot.hand
+            });
+          };
+
+          // Update playCard function to handle abilities
           const playCard = (handIndex) => {
-            // Check if it's player's turn
+            console.log(`Attempting to play card at index ${handIndex}`);
+            
             if (gameState.turn !== 'player') {
+              console.log("Not player's turn - cannot play card");
               message.value = "It's not your turn!";
               return false;
             }
             
-            // Validate card index
-            if (handIndex < 0 || handIndex >= gameState.player.hand.length) {
+            const card = gameState.player.hand[handIndex];
+            if (!card) {
+              console.log("Invalid card selection");
               message.value = "Invalid card selection";
               return false;
             }
             
-            // Get the selected card
-            const card = gameState.player.hand[handIndex];
-            
-            // Check if player has enough mana
             if (card.manaCost > gameState.player.mana) {
+              console.log(`Not enough mana: needs ${card.manaCost}, has ${gameState.player.mana}`);
               message.value = `Not enough mana! You need ${card.manaCost} but have ${gameState.player.mana}`;
               return false;
             }
             
+            console.log(`Playing ${card.name} (${card.attack}/${card.defense}) for ${card.manaCost} mana`);
+            
             // Make a deep copy of the card to avoid reference issues
-            const playedCard = { 
+            const playedCard = {
               name: card.name,
               attack: card.attack,
               defense: card.defense,
-              manaCost: card.manaCost
+              manaCost: card.manaCost,
+              ability: card.ability ? { ...card.ability } : undefined
             };
             
-            // Remove card from hand
+            // Remove the card from hand first
             gameState.player.hand.splice(handIndex, 1);
             
-            // Add deep copy to board
+            // Add to board and deduct mana
             gameState.player.board.push(playedCard);
+            gameState.player.mana -= card.manaCost;
             
-            // Deduct mana cost
-            gameState.player.mana -= playedCard.manaCost;
+            // Handle the card's ability
+            handleCardAbility(playedCard, 'player', gameState);
             
-            message.value = `You played ${playedCard.name}`;
-            addToCombatLog(`You played ${playedCard.name} (${playedCard.attack}/${playedCard.defense})`, 'play');
+            console.log(`Player board after play:`, gameState.player.board);
+            console.log(`Player mana remaining: ${gameState.player.mana}`);
             
+            message.value = `You played ${card.name}`;
+            addToCombatLog(`You played ${card.name} (${card.attack}/${card.defense})`, 'play');
+            
+            // Return true to indicate successful play and prevent additional plays
             return true;
           };
           
-          // Bot plays a card
+          // Update botPlayCard function to handle abilities
           const botPlayCard = () => {
-            // Find playable cards (ones bot has enough mana for)
+            const turnPrefix = `[Turn_${gameState.turnNumber}][BotTurn][Bot]`;
+            console.log(`${turnPrefix} Attempting to play a card`);
+            
             const playableCards = gameState.bot.hand
               .map((card, index) => ({ card, index }))
               .filter(item => item.card.manaCost <= gameState.bot.mana)
-              .sort((a, b) => b.card.manaCost - a.card.manaCost); // Sort by highest mana cost first
+              .sort((a, b) => b.card.manaCost - a.card.manaCost);
             
             if (playableCards.length === 0) {
+              console.log(`${turnPrefix} No playable cards available`);
               message.value = "Bot has no playable cards";
               return false;
             }
             
-            // Play the card with highest mana cost
             const { card, index } = playableCards[0];
+            console.log(`${turnPrefix} Selected card to play:`, card);
             
             // Make a deep copy of the card to avoid reference issues
             const playedCard = { 
               name: card.name,
               attack: card.attack,
               defense: card.defense,
-              manaCost: card.manaCost
+              manaCost: card.manaCost,
+              ability: card.ability ? { ...card.ability } : undefined
             };
             
-            // Remove from hand
             gameState.bot.hand.splice(index, 1);
-            
-            // Add to board - ensure we're not using a reference to the original card
             gameState.bot.board.push(playedCard);
-            
-            // Deduct mana
             gameState.bot.mana -= playedCard.manaCost;
             
             message.value = `Bot played ${playedCard.name}`;
             addToCombatLog(`Bot played ${playedCard.name} (${playedCard.attack}/${playedCard.defense})`, 'bot-play');
+            
+            // Handle the card's ability
+            handleCardAbility(playedCard, 'bot', gameState);
             
             return true;
           };
@@ -1188,16 +1465,39 @@
           
           // Process battle cleanup (remove dead cards)
           const processBattleCleanup = () => {
-            // Remove cards with health <= 0 from both sides
-            gameState.player.board = gameState.player.board.filter(card => card.defense > 0);
-            gameState.bot.board = gameState.bot.board.filter(card => card.defense > 0);
+            console.log("Processing battle cleanup");
+            console.log("Player board before cleanup:", gameState.player.board);
+            console.log("Bot board before cleanup:", gameState.bot.board);
             
-            // Reset attacker/defender selection
+            gameState.player.board = gameState.player.board.filter(card => {
+              console.log(`Player card ${card.name}: ${card.defense} defense remaining`);
+              return card.defense > 0;
+            });
+            
+            gameState.bot.board = gameState.bot.board.filter(card => {
+              console.log(`Bot card ${card.name}: ${card.defense} defense remaining`);
+              return card.defense > 0;
+            });
+            
+            console.log("Player board after cleanup:", gameState.player.board);
+            console.log("Bot board after cleanup:", gameState.bot.board);
+            
             gameState.attacker = null;
             gameState.defender = null;
             
-            // Check for victory conditions
-            checkVictoryConditions();
+            if (gameState.player.health <= 0) {
+              console.log("Player health depleted. Bot wins!");
+              gameOver.value = true;
+              winner.value = 'bot';
+              message.value = "Your health is depleted. Bot wins!";
+            } else if (gameState.bot.health <= 0) {
+              console.log("Bot health depleted. Player wins!");
+              gameOver.value = true;
+              winner.value = 'player';
+              message.value = "Bot's health is depleted. You win!";
+            } else {
+              setTimeout(() => endTurn(), 500);
+            }
           };
           
           // Check if either player has won
@@ -1220,452 +1520,200 @@
             gameState.combatLog.push(newLog);
           };
           
-          // Battle between cards
+          // Process battle pairs sequentially
+          const processBattlePairs = (pairs) => {
+            console.log("Processing battle pairs:", pairs);
+            
+            pairs.forEach(({ playerIdx, botIdx }) => {
+              const playerCard = gameState.player.board[playerIdx];
+              const botCard = gameState.bot.board[botIdx];
+              
+              if (playerCard && botCard) {
+                console.log(`Processing battle: ${playerCard.name} vs ${botCard.name}`);
+                
+                // Calculate and apply damage
+                const playerDamage = botCard.attack;
+                const botDamage = playerCard.attack;
+                
+                playerCard.defense -= playerDamage;
+                botCard.defense -= botDamage;
+                
+                console.log(`${playerCard.name}: ${playerCard.defense} defense remaining`);
+                console.log(`${botCard.name}: ${botCard.defense} defense remaining`);
+                
+                addToCombatLog(`${playerCard.name} (${playerCard.attack}/${playerCard.defense}) battled ${botCard.name} (${botCard.attack}/${botCard.defense})`, 'battle');
+              }
+            });
+            
+            // Process cleanup after all battles
+            setTimeout(() => processBattleCleanup(), 1000);
+          };
+          
+          // Update battle function to respect protection status
           const battle = (playerCardIdx, botCardIdx) => {
+            const turnPrefix = `[Turn_${gameState.turnNumber}][Battle][${gameState.turn === 'player' ? 'Player' : 'Bot'}]`;
+            
             if (playerCardIdx !== undefined && botCardIdx !== undefined) {
+              console.log(`${turnPrefix} Specific battle: Player ${playerCardIdx} vs Bot ${botCardIdx}`);
               try {
-                // Get the cards involved in battle
                 const playerCard = gameState.player.board[playerCardIdx];
                 const botCard = gameState.bot.board[botCardIdx];
                 
                 if (!playerCard || !botCard) {
+                  console.error(`${turnPrefix} Invalid battle selection:`, {
+                    playerCardIdx, 
+                    botCardIdx,
+                    playerBoardLength: gameState.player.board.length,
+                    botBoardLength: gameState.bot.board.length
+                  });
                   message.value = "Invalid battle selection";
                   return;
                 }
                 
-                message.value = `${playerCard.name} attacks ${botCard.name}`;
-                
-                // Cards deal damage to each other simultaneously
-                const playerCardDamageTaken = botCard.attack;
-                const botCardDamageTaken = playerCard.attack;
-                
-                playerCard.defense -= playerCardDamageTaken;
-                botCard.defense -= botCardDamageTaken;
-                
-                addToCombatLog(`${playerCard.name} (${playerCard.attack}/${playerCard.defense + playerCardDamageTaken}) attacks ${botCard.name} (${botCard.attack}/${botCard.defense + botCardDamageTaken})`, 'battle');
-                
-                // Report results
-                if (playerCard.defense <= 0 && botCard.defense <= 0) {
-                  addToCombatLog(`Both ${playerCard.name} and ${botCard.name} were destroyed in battle!`, 'draw');
-                } else if (playerCard.defense <= 0) {
-                  addToCombatLog(`${playerCard.name} was destroyed by ${botCard.name}!`, 'bot-win');
-                } else if (botCard.defense <= 0) {
-                  addToCombatLog(`${playerCard.name} destroyed ${botCard.name}!`, 'player-win');
-                } else {
-                  addToCombatLog(`Both cards survived the battle.`, 'info');
+                // Check for protection status
+                if (playerCard.status?.protected > 0) {
+                  message.value = `${playerCard.name} is protected and cannot be damaged this turn`;
+                  addToCombatLog(`${playerCard.name} is protected and cannot be damaged`, 'ability');
+                  return;
                 }
                 
-                // Cleanup after battle
+                if (botCard.status?.protected > 0) {
+                  message.value = `${botCard.name} is protected and cannot be damaged this turn`;
+                  addToCombatLog(`${botCard.name} is protected and cannot be damaged`, 'ability');
+                  return;
+                }
+                
+                console.log(`${turnPrefix} Battle: ${playerCard.name}(${playerCard.attack}/${playerCard.defense}) vs ${botCard.name}(${botCard.attack}/${botCard.defense})`);
+                
+                playerCard.defense -= botCard.attack;
+                botCard.defense -= playerCard.attack;
+                
+                console.log(`${turnPrefix} After battle: ${playerCard.name}(${playerCard.attack}/${playerCard.defense}) vs ${botCard.name}(${botCard.attack}/${botCard.defense})`);
+                
+                message.value = `${playerCard.name} battled ${botCard.name}`;
+                addToCombatLog(`${playerCard.name} (${playerCard.attack}/${playerCard.defense}) battled ${botCard.name} (${botCard.attack}/${botCard.defense})`, 'battle');
+                
                 setTimeout(() => processBattleCleanup(), 1000);
               } catch (error) {
-                console.error("Error in battle function:", error);
+                console.error(`${turnPrefix} Error in battle:`, error);
                 message.value = "An error occurred during battle";
               }
-            }
-            else {
-              // Full battle on end turn
-              console.log("Full battle on end turn");
+            } else {
+              console.log(`${turnPrefix} Full battle initiated`);
+              console.log(`${turnPrefix} Player board (${gameState.player.board.length} cards):`, gameState.player.board);
+              console.log(`${turnPrefix} Bot board (${gameState.bot.board.length} cards):`, gameState.bot.board);
               
-              // Check if player has attackers
               if (gameState.player.board.length === 0) {
-                // Direct damage from bot to player
+                console.log(`${turnPrefix} Player has no attackers, checking for direct damage from bot`);
                 const totalBotAttack = gameState.bot.board.reduce((sum, card) => sum + card.attack, 0);
+                console.log(`${turnPrefix} Bot can deal ${totalBotAttack} direct damage`);
+                
                 if (totalBotAttack > 0) {
-                  message.value = `Bot has ${totalBotAttack} attack power and deals direct damage to you!`;
+                  const newHealth = Math.max(0, gameState.player.health - totalBotAttack);
+                  console.log(`${turnPrefix} Player health: ${gameState.player.health} -> ${newHealth}`);
+                  gameState.player.health = newHealth;
+                  message.value = `Bot dealt ${totalBotAttack} direct damage to you!`;
+                  addToCombatLog(`Bot dealt ${totalBotAttack} direct damage to you!`, 'direct-damage');
                   
-                  // Deal direct damage to player
-                  gameState.player.health = Math.max(0, gameState.player.health - totalBotAttack);
-                  addToCombatLog(`Bot deals ${totalBotAttack} direct damage to you!`, 'direct-damage');
-                  
-                  // Check for defeat
-                  if (gameState.player.health <= 0) {
+                  if (newHealth <= 0) {
+                    console.log(`${turnPrefix} Player defeated by direct damage`);
                     gameOver.value = true;
                     winner.value = 'bot';
                     message.value = "Game Over! You have been defeated.";
                     return;
                   }
                 }
-                
-                endTurn();
+                setTimeout(() => endTurn(), 1000);
                 return;
               }
               
-              // Check if bot has defenders
               if (gameState.bot.board.length === 0) {
-                // Direct damage from player to bot
+                console.log(`${turnPrefix} Bot has no defenders, dealing direct damage to bot`);
                 const totalAttack = gameState.player.board.reduce((sum, card) => sum + card.attack, 0);
+                console.log(`${turnPrefix} Player dealing ${totalAttack} direct damage`);
                 
-                // Deal direct damage to bot
-                gameState.bot.health = Math.max(0, gameState.bot.health - totalAttack);
+                const newBotHealth = Math.max(0, gameState.bot.health - totalAttack);
+                console.log(`${turnPrefix} Bot health: ${gameState.bot.health} -> ${newBotHealth}`);
+                gameState.bot.health = newBotHealth;
                 message.value = `You dealt ${totalAttack} direct damage to the bot!`;
-                addToCombatLog(`Your cards deal ${totalAttack} direct damage to the bot!`, 'direct-damage');
+                addToCombatLog(`Your cards dealt ${totalAttack} direct damage to the bot!`, 'direct-damage');
                 
-                // Check for victory
-                if (gameState.bot.health <= 0) {
+                if (newBotHealth <= 0) {
+                  console.log(`${turnPrefix} Bot defeated by direct damage`);
                   gameOver.value = true;
                   winner.value = 'player';
                   message.value = "You win! The bot has been defeated.";
                   return;
                 }
                 
-                endTurn();
+                setTimeout(() => endTurn(), 1500);
                 return;
               }
               
-              // Create battle pairs - match cards 1:1 until one side runs out
+              // Create battle pairs
               const battlePairs = [];
               for (let i = 0; i < Math.min(gameState.player.board.length, gameState.bot.board.length); i++) {
+                console.log(`${turnPrefix} Creating battle pair: Player card ${i} vs Bot card ${i}`);
                 battlePairs.push({
                   playerIdx: i,
                   botIdx: i
                 });
               }
               
-              // Process each battle in sequence rather than recursively
-              processFirstBattle(battlePairs, 0);
+              processBattlePairs(battlePairs);
             }
           };
           
-          // Process the first battle in a sequence
-          const processFirstBattle = (pairs, index) => {
-            if (index >= pairs.length) {
-              // All battles complete, check for remaining attackers for direct damage
-              processRemainingCards(pairs.length);
-              return;
-            }
-            
-            // Process the current battle
-            const pair = pairs[index];
-            
-            // Get the cards involved in battle
-            const playerCard = gameState.player.board[pair.playerIdx];
-            const botCard = gameState.bot.board[pair.botIdx];
-            
-            if (!playerCard || !botCard) {
-              // Skip invalid battle and move to next
-              setTimeout(() => processFirstBattle(pairs, index + 1), 300);
-              return;
-            }
-            
-            message.value = `${playerCard.name} attacks ${botCard.name}`;
-            
-            // Cards deal damage to each other simultaneously
-            const playerCardDamageTaken = botCard.attack;
-            const botCardDamageTaken = playerCard.attack;
-            
-            playerCard.defense -= playerCardDamageTaken;
-            botCard.defense -= botCardDamageTaken;
-            
-            // Create visual effects for the battle
-            createBattleEffects(pair.playerIdx, pair.botIdx, playerCardDamageTaken, botCardDamageTaken);
-            
-            addToCombatLog(`${playerCard.name} (${playerCard.attack}/${playerCard.defense + playerCardDamageTaken}) attacks ${botCard.name} (${botCard.attack}/${botCard.defense + botCardDamageTaken})`, 'battle');
-            
-            // Report results
-            if (playerCard.defense <= 0 && botCard.defense <= 0) {
-              addToCombatLog(`Both ${playerCard.name} and ${botCard.name} were destroyed in battle!`, 'draw');
-            } else if (playerCard.defense <= 0) {
-              addToCombatLog(`${playerCard.name} was destroyed by ${botCard.name}!`, 'bot-win');
-            } else if (botCard.defense <= 0) {
-              addToCombatLog(`${playerCard.name} destroyed ${botCard.name}!`, 'player-win');
-            } else {
-              addToCombatLog(`Both cards survived the battle.`, 'info');
-            }
-            
-            // Cleanup cards after this specific battle immediately
-            if (playerCard.defense <= 0) {
-              gameState.player.board.splice(pair.playerIdx, 1);
-              // Adjust remaining player indexes
-              for (let i = index + 1; i < pairs.length; i++) {
-                if (pairs[i].playerIdx > pair.playerIdx) {
-                  pairs[i].playerIdx--;
-                }
-              }
-            }
-            
-            if (botCard.defense <= 0) {
-              gameState.bot.board.splice(pair.botIdx, 1);
-              // Adjust remaining bot indexes
-              for (let i = index + 1; i < pairs.length; i++) {
-                if (pairs[i].botIdx > pair.botIdx) {
-                  pairs[i].botIdx--;
-                }
-              }
-            }
-            
-            // Process the next battle after a delay
-            setTimeout(() => processFirstBattle(pairs, index + 1), 2000);
-          };
-          
-          // Create visual battle effects
-          const createBattleEffects = (playerCardIdx, botCardIdx, playerDamage, botDamage) => {
-            try {
-              // Get the battlefield and card elements
-              const battlefield = document.querySelector('.battlefield-2d');
-              if (!battlefield) return;
-              
-              // Find the specific cards
-              const playerCardElements = battlefield.querySelectorAll(`.battlefield-2d-card[style*="bottom: 50px"]`);
-              const botCardElements = battlefield.querySelectorAll(`.battlefield-2d-card[style*="top: 50px"]`);
-              
-              if (!playerCardElements.length || !botCardElements.length) return;
-              
-              const playerCardElement = playerCardElements[playerCardIdx];
-              const botCardElement = botCardElements[botCardIdx];
-              
-              if (!playerCardElement || !botCardElement) return;
-              
-              // Calculate clash point (middle point between the two cards)
-              const playerRect = playerCardElement.getBoundingClientRect();
-              const botRect = botCardElement.getBoundingClientRect();
-              
-              const clashX = (playerRect.left + botRect.left + playerRect.width/2 + botRect.width/2) / 2;
-              const clashY = (playerRect.top + botRect.top + playerRect.height/2 + botRect.height/2) / 2;
-              
-              // 1. Add attack animation classes
-              playerCardElement.classList.add('attacking');
-              botCardElement.classList.add('defending');
-              
-              // 2. Create clash effect in the middle
-              const clashEffect = document.createElement('div');
-              clashEffect.className = 'clash-effect';
-              clashEffect.style.left = `${clashX}px`;
-              clashEffect.style.top = `${clashY}px`;
-              document.body.appendChild(clashEffect);
-              
-              // 3. Create damage numbers for both cards
-              const playerDamageNumber = document.createElement('div');
-              playerDamageNumber.className = 'damage-number defense';
-              playerDamageNumber.textContent = `-${playerDamage}`;
-              playerDamageNumber.style.left = `${playerRect.left + playerRect.width/2}px`;
-              playerDamageNumber.style.top = `${playerRect.top + playerRect.height/2}px`;
-              document.body.appendChild(playerDamageNumber);
-              
-              const botDamageNumber = document.createElement('div');
-              botDamageNumber.className = 'damage-number attack';
-              botDamageNumber.textContent = `-${botDamage}`;
-              botDamageNumber.style.left = `${botRect.left + botRect.width/2}px`;
-              botDamageNumber.style.top = `${botRect.top + botRect.height/2}px`;
-              document.body.appendChild(botDamageNumber);
-              
-              // 4. Add shake animation to damaged cards
-              if (playerDamage > 0) {
-                setTimeout(() => playerCardElement.classList.add('damaged'), 800);
-              }
-              if (botDamage > 0) {
-                setTimeout(() => botCardElement.classList.add('damaged'), 800);
-              }
-              
-              // 5. Clean up after animations complete
-              setTimeout(() => {
-                playerCardElement.classList.remove('attacking', 'damaged');
-                botCardElement.classList.remove('defending', 'damaged');
-                if (clashEffect.parentNode) clashEffect.parentNode.removeChild(clashEffect);
-                if (playerDamageNumber.parentNode) playerDamageNumber.parentNode.removeChild(playerDamageNumber);
-                if (botDamageNumber.parentNode) botDamageNumber.parentNode.removeChild(botDamageNumber);
-              }, 1800);
-              
-            } catch (error) {
-              console.error('Error creating battle effects:', error);
-            }
-          };
-          
-          // Process remaining cards after all battles
-          const processRemainingCards = (battlesCompleted) => {
-            const remainingPlayerCards = gameState.player.board.length;
-            const remainingBotCards = gameState.bot.board.length;
-            
-            // Handle player's remaining cards (deal damage to bot)
-            if (remainingPlayerCards > 0) {
-              const remainingAttack = gameState.player.board
-                .reduce((sum, card) => sum + card.attack, 0);
-                
-              // Deal direct damage
-              gameState.bot.health = Math.max(0, gameState.bot.health - remainingAttack);
-              message.value = `Your remaining cards dealt ${remainingAttack} direct damage!`;
-              addToCombatLog(`Your remaining cards dealt ${remainingAttack} direct damage to the bot!`, 'direct-damage');
-              
-              // Create direct damage effect
-              createDirectDamageEffect('bot', remainingAttack);
-              
-              // Check for victory
-              if (gameState.bot.health <= 0) {
-                gameOver.value = true;
-                winner.value = 'player';
-                message.value = "You win! The bot has been defeated.";
-                return;
-              }
-            }
-            
-            // Handle bot's remaining cards (deal damage to player)
-            if (remainingBotCards > 0) {
-              const remainingBotAttack = gameState.bot.board
-                .reduce((sum, card) => sum + card.attack, 0);
-              
-              if (remainingBotAttack > 0) {
-                // Deal direct damage to player
-                gameState.player.health = Math.max(0, gameState.player.health - remainingBotAttack);
-                message.value = `Bot's remaining cards dealt ${remainingBotAttack} direct damage to you!`;
-                addToCombatLog(`Bot's remaining cards dealt ${remainingBotAttack} direct damage to you!`, 'direct-damage');
-                
-                // Create direct damage effect
-                createDirectDamageEffect('player', remainingBotAttack);
-                
-                // Check for defeat
-                if (gameState.player.health <= 0) {
-                  gameOver.value = true;
-                  winner.value = 'bot';
-                  message.value = "Game Over! You have been defeated.";
-                  return;
-                }
-              }
-            }
-            
-            // Battle phase complete, move to end turn
-            setTimeout(() => {
-              checkVictoryConditions();
-              setTimeout(() => endTurn(), 500);
-            }, 1500);
-          };
-          
-          // Create direct damage effect animation
-          const createDirectDamageEffect = (target, damage) => {
-            try {
-              // Determine the target area
-              const targetSection = document.querySelector(target === 'player' ? '.player-section' : '.bot-section');
-              const targetHealth = document.querySelector(target === 'player' ? '.player-stats .health' : '.bot-stats .health');
-              
-              if (!targetSection || !targetHealth) return;
-              
-              // 1. Add flash effect to the section
-              const flashEffect = document.createElement('div');
-              flashEffect.className = 'direct-damage-effect';
-              targetSection.appendChild(flashEffect);
-              
-              // 2. Add damage number in the center
-              const damageNumber = document.createElement('div');
-              damageNumber.className = 'damage-number attack';
-              damageNumber.textContent = `-${damage}`;
-              damageNumber.style.fontSize = '48px';
-              
-              const sectionRect = targetSection.getBoundingClientRect();
-              damageNumber.style.left = `${sectionRect.left + sectionRect.width/2}px`;
-              damageNumber.style.top = `${sectionRect.top + sectionRect.height/2}px`;
-              document.body.appendChild(damageNumber);
-              
-              // 3. Add ray effect
-              const rayEffect = document.createElement('div');
-              rayEffect.className = 'direct-damage-rays';
-              rayEffect.style.left = `${sectionRect.left + sectionRect.width/2 - 150}px`;
-              rayEffect.style.top = `${sectionRect.top + sectionRect.height/2 - 150}px`;
-              document.body.appendChild(rayEffect);
-              
-              // 4. Animate the health display
-              targetHealth.classList.add('health-damage');
-              
-              // 5. Clean up after animations complete
-              setTimeout(() => {
-                if (flashEffect.parentNode) flashEffect.parentNode.removeChild(flashEffect);
-                if (damageNumber.parentNode) damageNumber.parentNode.removeChild(damageNumber);
-                if (rayEffect.parentNode) rayEffect.parentNode.removeChild(rayEffect);
-                targetHealth.classList.remove('health-damage');
-              }, 1500);
-              
-            } catch (error) {
-              console.error('Error creating direct damage effect:', error);
-            }
-          };
-          
-          // Bot's turn processing
-          const processBotTurn = () => {
-            // Draw a card
-            drawCard('bot');
-            
-            // Let bot play cards until it can't play anymore
-            let cardsPlayed = 0;
-            let keepPlaying = true;
-            
-            while (keepPlaying && cardsPlayed < 3 && gameState.bot.hand.length > 0) {
-              if (!botPlayCard()) {
-                keepPlaying = false;
-              } else {
-                cardsPlayed++;
-              }
-            }
-            
-            // End bot's turn
-            setTimeout(() => {
-              message.value = "Bot ends its turn. Your turn now.";
-              endTurn();
-            }, 1000);
-          };
-          
-          // End current turn and start next turn
+          // Update endTurn function to handle protection status decay
           const endTurn = () => {
-            // Determine next turn
+            console.log("Processing end turn");
+            
+            // Decrement protection status on all cards
+            gameState.player.hand.forEach(card => {
+              if (card.status?.protected > 0) {
+                card.status.protected--;
+                if (card.status.protected === 0) {
+                  delete card.status;
+                }
+              }
+            });
+            
+            gameState.bot.hand.forEach(card => {
+              if (card.status?.protected > 0) {
+                card.status.protected--;
+                if (card.status.protected === 0) {
+                  delete card.status;
+                }
+              }
+            });
+            
+            // Rest of the endTurn function remains the same
             const nextTurn = gameState.turn === 'player' ? 'bot' : 'player';
             const nextTurnNumber = nextTurn === 'player' ? gameState.turnNumber + 1 : gameState.turnNumber;
             
-            // Calculate new mana
-            let nextPlayerMana = gameState.player.mana;
-            let nextBotMana = gameState.bot.mana;
+            const nextPlayerMana = Math.min(10, nextTurn === 'player' ? gameState.player.mana + 1 : gameState.player.mana);
+            const nextBotMana = Math.min(10, nextTurn === 'bot' ? gameState.bot.mana + 1 : gameState.bot.mana);
             
-            if (nextTurn === 'player') {
-              // Player's new turn - gain mana (max 10)
-              nextPlayerMana = Math.min(10, nextTurnNumber);
-            } else {
-              // Bot's new turn - gain mana (max 10)
-              nextBotMana = Math.min(10, nextTurnNumber);
-            }
-            
-            // Update game state
             gameState.turn = nextTurn;
             gameState.turnNumber = nextTurnNumber;
             gameState.player.mana = nextPlayerMana;
             gameState.bot.mana = nextBotMana;
             
-            // Reset attacker/defender
             gameState.attacker = null;
             gameState.defender = null;
             
             if (nextTurn === 'bot') {
               message.value = "Bot is planning its move...";
-              
-              // Bot turn processing
               setTimeout(() => processBotTurn(), 800);
             } else {
-              // Draw a card for the player at the start of their turn
               drawCard('player');
               message.value = `Your turn ${nextTurnNumber}. You have ${nextPlayerMana} mana.`;
             }
           };
           
-          // Handle the player's end turn action
-          const handleEndTurn = () => {
-            if (gameState.turn !== 'player') {
-              message.value = "It's not your turn!";
-              return;
-            }
-            
-            // If player has cards on board and bot has cards, initiate battle
-            if (gameState.player.board.length > 0 && gameState.bot.board.length > 0) {
-              message.value = "Initiating battle phase...";
-              battle(); // No args means full battle
-            } else {
-              // Skip battle phase if no attackers or defenders
-              if (gameState.player.board.length > 0 && gameState.bot.board.length === 0) {
-                battle(); // Will handle direct damage
-              } else if (gameState.player.board.length === 0 && gameState.bot.board.length > 0) {
-                battle(); // Will handle direct damage
-              } else {
-                // No cards on either side, just end turn
-                endTurn();
-              }
-            }
-          };
-          
           // Initialize game on component mount
           onMounted(() => {
+            setupGameLogging(gameState);
             initializeGame();
           });
           
@@ -1679,7 +1727,7 @@
             gameOver,
             winner,
             playCard,
-            handleEndTurn,
+            handleEndTurn: endTurn,
             selectAttacker,
             selectDefender,
             backToMenu: () => emit('back-to-menu')
@@ -1739,6 +1787,30 @@
       
       // Mount the Vue app
       createApp(App).mount('#app');
+
+      // Add inside Game component setup
+      const setupGameLogging = (gameState) => {
+        // Watch for deck changes
+        watch(() => gameState.player.deck.length, (newVal, oldVal) => {
+          console.log(`Player deck size changed: ${oldVal} -> ${newVal}`);
+        });
+
+        watch(() => gameState.player.hand.length, (newVal, oldVal) => {
+          console.log(`Player hand size changed: ${oldVal} -> ${newVal}`);
+        });
+
+        watch(() => gameState.bot.deck.length, (newVal, oldVal) => {
+          console.log(`Bot deck size changed: ${oldVal} -> ${newVal}`);
+        });
+
+        watch(() => gameState.bot.hand.length, (newVal, oldVal) => {
+          console.log(`Bot hand size changed: ${oldVal} -> ${newVal}`);
+        });
+
+        watch(() => gameState.turn, (newTurn, oldTurn) => {
+          console.log(`Turn changed: ${oldTurn} -> ${newTurn}`);
+        });
+      };
     </script>
   </body>
 </html> 

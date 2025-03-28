@@ -20,7 +20,7 @@
      * 
      * 2. ✋ Hand
      *    - Visible to the player (not opponent)
-     *    - Each opponent starts with 5 cards on his hand
+     *    - Each opponent starts with 3 cards on his hand
      *    - Cards drawn from the deck
      *    - You can only play cards from your hand
      *    - Max hand size = 10
@@ -42,7 +42,7 @@
      * - Max 6 units on board
      * - One blocker per attacker
      * - If attack > defense → unit dies
-     * - Unblocked attackers deal damage to enemy health
+     * - Unblocked attackers deal damage to enemy health. So if cards are blocked by other cards they cannot deal direct damage to any players health.
      * 
      * --- Mana Rules ---
      * - +1 mana per turn, max 10
